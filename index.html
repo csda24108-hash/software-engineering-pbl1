@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>キーボードなし文字入力ソフト</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin-top: 30px;
+            /* ドラッグ時のテキスト選択などを防ぐ */
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+        #output-area {
+            width: 80%;
+            max-width: 400px;
+            height: 50px;
+            font-size: 24px;
+            margin: 0 auto 20px auto;
+            padding: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            text-align: left;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        /* 入力パッドのスタイル（十字配置に変更） */
+        #input-pad {
+            width: 250px;
+            height: 250px;
+            margin: 0 auto 20px auto;
+            border: 3px dashed #888;
+            border-radius: 15px;
+            background-color: #eef;
+            /* Gridレイアウトで3x3のマス目を作る */
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            align-items: center;
+            justify-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #555;
+            cursor: crosshair;
+            /* タッチデバイスでのスクロールを防止 */
+            touch-action: none; 
+        }
+
+        /* フリックガイドの文字色を少し薄くする */
+        .guide-char {
+            color: #888;
+        }
+
+        .keyboard {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        button {
+            font-size: 20px;
+            padding: 15px 20px;
+            cursor: pointer;
+            border: 1px solid #999;
+            border-radius: 5px;
+            background-color: #fff;
+        }
+        button:hover {
+            background-color: #e0e0e0;
+        }
+        .control-btn {
+            background-color: #f0c0c0;
+        }
+        .control-btn:hover {
+            background-color: #d0a0a0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>文字入力（スマホ風フリック対応）</h1>
+
+    <div id="output-area"></div>
+
+    <div id="input-pad">
+        <div></div><div class="guide-char">う</div><div></div>
+        <div class="guide-char">い</div><div>あ</div><div class="guide-char">え</div>
+        <div></div><div class="guide-char">お</div><div></div>
+    </div>
+
+    <div class="keyboard">
+        <button onclick="addChar('あ')">あ</button>
+        <button onclick="addChar('い')">い</button>
+        <button onclick="addChar('う')">う</button>
+        <button onclick="addChar('え')">え</button>
+        <button onclick="addChar('お')">お</button>
+        
+        <button class="control-btn" onclick="deleteChar()">削除</button>
+        <button class="control-btn" onclick="clearAll()">クリア</button>
+    </div>
+
+    <script>
+        let currentText = "";
+        const outputArea = document.getElementById("output-area");
+        const inputPad = document.getElementById("input-pad");
+
+        function updateDisplay() {
+            outputArea.textContent = currentText;
+        }
+
+        function addChar(char) {
+            currentText += char;
+            updateDisplay();
+        }
+
+        function deleteChar() {
+            if (currentText.length > 0) {
+                currentText = currentText.slice(0, -1);
+                updateDisplay();
+            }
+        }
+
+        function clearAll() {
+            currentText = "";
+            updateDisplay();
+        }
+
+        // --- ここからマウスドラッグ（フリック）の処理 ---
+        let startX = 0;
+        let startY = 0;
+        let isDragging = false;
+        const THRESHOLD = 30; // フリックと判定する最低移動距離(ピクセル)
+
+        // ポインター（マウス/タッチ）を押したとき
+        inputPad.addEventListener("pointerdown", (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            inputPad.style.backgroundColor = "#ccf"; // 押下中の視覚フィードバック
+            
+            // ポインターをキャプチャ
+            inputPad.setPointerCapture(e.pointerId);
+        });
+
+        // ポインターを離したとき
+        inputPad.addEventListener("pointerup", (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            inputPad.style.backgroundColor = "#eef";
+            inputPad.releasePointerCapture(e.pointerId);
+
+            const endX = e.clientX;
+            const endY = e.clientY;
+            
+            const dx = endX - startX;
+            const dy = endY - startY;
+
+            let charToInput = "";
+
+            // 移動距離が閾値未満なら「あ」（動かさない/タップ）
+            if (Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) {
+                charToInput = "あ";
+            } else {
+                // 水平方向と垂直方向、どちらへの移動量が大きいかで判定
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // 水平方向の移動
+                    if (dx > 0) {
+                        charToInput = "え"; // 右
+                    } else {
+                        charToInput = "い"; // 左
+                    }
+                } else {
+                    // 垂直方向の移動
+                    if (dy > 0) {
+                        charToInput = "お"; // 下
+                    } else {
+                        charToInput = "う"; // 上
+                    }
+                }
+            }
+
+            addChar(charToInput);
+        });
+
+        // キャプチャがキャンセルされた場合の処理
+        inputPad.addEventListener("pointercancel", (e) => {
+            isDragging = false;
+            inputPad.style.backgroundColor = "#eef";
+        });
+    </script>
+
+</body>
+</html>
